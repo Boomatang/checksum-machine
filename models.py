@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Integer, create_engine
+from sqlalchemy import Column, String, DateTime, Integer, create_engine, ForeignKeyConstraint
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -17,6 +17,9 @@ class CheckObjs(Base):
     checksum = Column(String)
     last_checked = Column(DateTime)
 
+    def __repr__(self):
+        return 'Check Object: %s' % self.file_name
+
 
 class Folders(Base):
     __tablename__ = 'folder_names'
@@ -26,6 +29,15 @@ class Folders(Base):
     added_date = Column(DateTime)
     check_count = Column(Integer, default=0)
     last_checked = Column(DateTime)
+
+
+class HashTable(Base):
+    __tablename__ = 'Hash_Table'
+
+    id = Column(Integer, primary_key=True)
+    file_id = Column(Integer)
+    hash_id = Column(Integer)
+    ForeignKeyConstraint([file_id], [CheckObjs.id])
 
 
 if __name__ == '__main__':

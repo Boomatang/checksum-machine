@@ -1,4 +1,6 @@
 from pathlib import Path as P
+import hashlib
+
 from os import path
 import os
 
@@ -6,7 +8,7 @@ from sqlalchemy import create_engine, func
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 
-from models import Folders, CheckObjs
+from models import Folders, CheckObjs, HashTable
 
 engine = create_engine('sqlite:///data1.db')
 Session = sessionmaker()
@@ -14,6 +16,16 @@ Session.configure(bind=engine)
 session = Session()
 
 print(P.cwd())
+
+
+def get_file_hash(fname):
+
+    hash_md5 = hashlib.md5()
+    with open(fname, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+
+    return hash_md5.hexdigest()
 
 
 def get_folder_set(limit=100):
@@ -29,25 +41,35 @@ def get_folder_set(limit=100):
 
 def find_files(starting_point):
     now = datetime.utcnow()
-    for root, dirs, files in os.walk(starting_point):
-        for file_name in files:
-            x = path.join(root, file_name)
-            name = file_name.split('.')
+    root = P(starting_point)
+    item_list = []
+    folder_contents = root.iterdir()
+    y = 0
+
+    for folder_content in folder_contents:
+        file_name = P(folder_content)
+
+        if file_name.is_file():
+            x = file_name.resolve()
+            name = file_name.name
+
+            name = name.split('.')
 
             try:
                 ext = name[1]
             except IndexError:
-                ext = None
+                ext = 'None'
 
             name = name[0]
-
             item = CheckObjs(file_name=name,
                              file_ext=ext,
-                             full_path=x,
+                             full_path=str(x),
                              added_date=now)
-            session.add(item)
-
+            item_list.append(item)
+            y += 1
+    session.add_all(item_list)
     session.commit()
+    return y
 
 
 def add_folders(folder_list):
@@ -79,6 +101,7 @@ def walk_path(start):
                 y += len(path_folders)
                 path_folders = []
 
+
     add_folders(path_folders)
     y += len(path_folders)
 
@@ -87,23 +110,26 @@ def walk_path(start):
 
 if __name__ == '__main__':
     start_point = datetime.utcnow()
-    here = '/home/boomatang/Projects'
+    # here = '/home/boomatang/temp/project-lib/check'
+    # here = '/home/boomatang/Projects'
+    here = '/home/boomatang/Documents'
     y = walk_path(here)
     print(y)
 
     cycle = 0
     folder_count = session.query(func.count(Folders.id)).scalar()
-    get_count = 50
+    get_count = 200
+    count = 0
 
     print(folder_count)
     while cycle <= folder_count:
         now = datetime.utcnow()
-        print('cycle = ' + str(cycle))
+        print('Add files cycle = ' + str(cycle))
         content = get_folder_set(limit=get_count)
         # TODO put threads or something here
 
         for con in content:
-            find_files(con.folder_path)
+            count += find_files(con.folder_path)
             item = folder_checked(now, con)
             session.query(Folders). \
                 filter(Folders.id == item.id). \
@@ -111,3 +137,48 @@ if __name__ == '__main__':
                        synchronize_session=False)
         session.commit()
         cycle += get_count
+
+    print('Files found: ' + str(count))
+
+    # checking files
+    file_count = session.query(func.count(CheckObjs.id)).scalar()
+    cycle = 0
+    count = 0
+    while cycle <= file_count:
+        now = datetime.utcnow()
+        print('Files hashed cycle = ' + str(cycle))
+
+        all_files = session.query(CheckObjs).filter(CheckObjs.check_count == 0).limit(get_count)
+        test = []
+        for i in all_files:
+            i.checksum = get_file_hash(i.full_path)
+            i.check_count += 1
+            i.last_checked = now
+            test.append(i)
+            count += 1
+
+        session.add_all(test)
+
+        session.commit()
+        cycle += get_count
+    print('Files checked: ' + str(count))
+
+    # This is the hash count
+
+    query = session.query(CheckObjs.checksum, func.count(CheckObjs.id)).group_by(CheckObjs.checksum)
+    records = query.all()
+
+    hash_count_id = 1
+    for i in records:
+        hash_entries = []
+
+        if i[1] > 1:
+            get_files = session.query(CheckObjs).filter(CheckObjs.checksum == i[0])
+            files = get_files.all()
+            for this in files:
+                item = HashTable(file_id=this.id, hash_id=hash_count_id)
+                hash_entries.append(item)
+            session.add_all(hash_entries)
+            hash_count_id += 1
+        session.commit()
+
