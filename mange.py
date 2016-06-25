@@ -8,7 +8,7 @@ from sqlalchemy import create_engine, func
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 
-from models import Folders, CheckObjs, HashTable
+from models import Folders, CheckObjs, HashTable, HashCount
 
 engine = create_engine('sqlite:///data1.db')
 Session = sessionmaker()
@@ -89,6 +89,7 @@ def folder_checked(when, folder):
     folder.last_checked = when
     return folder
 
+
 def walk_path(start):
     path_folders = []
     y = 0
@@ -101,7 +102,6 @@ def walk_path(start):
                 y += len(path_folders)
                 path_folders = []
 
-
     add_folders(path_folders)
     y += len(path_folders)
 
@@ -111,8 +111,8 @@ def walk_path(start):
 if __name__ == '__main__':
     start_point = datetime.utcnow()
     # here = '/home/boomatang/temp/project-lib/check'
-    # here = '/home/boomatang/Projects'
-    here = '/home/boomatang/Documents'
+    here = '/home/boomatang/Projects'
+    # here = '/home/boomatang/Documents'
     y = walk_path(here)
     print(y)
 
@@ -171,14 +171,24 @@ if __name__ == '__main__':
     hash_count_id = 1
     for i in records:
         hash_entries = []
-
         if i[1] > 1:
-            get_files = session.query(CheckObjs).filter(CheckObjs.checksum == i[0])
-            files = get_files.all()
-            for this in files:
-                item = HashTable(file_id=this.id, hash_id=hash_count_id)
-                hash_entries.append(item)
-            session.add_all(hash_entries)
+            item = HashCount(checksum=i[0], count=i[1])
+            hash_entries.append(item)
             hash_count_id += 1
-        session.commit()
+        session.add_all(hash_entries)
+    session.commit()
 
+    # add the ids to the hash table
+
+    query = session.query(HashCount)
+    result = query.all()
+
+    for i in result:
+        log_items = []
+        items = session.query(CheckObjs).filter(CheckObjs.checksum == i.checksum).limit(i.count)
+        items = items.all()
+        for item in items:
+            log = HashTable(file_id=item.id, hash_id=i.id)
+            log_items.append(log)
+        session.add_all(log_items)
+    session.commit()

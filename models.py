@@ -31,6 +31,14 @@ class Folders(Base):
     last_checked = Column(DateTime)
 
 
+class HashCount(Base):
+    __tablename__ = 'Hash_Counts'
+
+    id = Column(Integer, primary_key=True)
+    checksum = Column(String)
+    count = Column(Integer)
+
+
 class HashTable(Base):
     __tablename__ = 'Hash_Table'
 
@@ -38,6 +46,10 @@ class HashTable(Base):
     file_id = Column(Integer)
     hash_id = Column(Integer)
     ForeignKeyConstraint([file_id], [CheckObjs.id])
+    ForeignKeyConstraint([hash_id], [HashCount.id])
+
+
+
 
 
 if __name__ == '__main__':
