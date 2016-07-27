@@ -111,8 +111,9 @@ def walk_path(start):
 if __name__ == '__main__':
     start_point = datetime.utcnow()
     # here = '/home/boomatang/temp/project-lib/check'
-    here = '/home/boomatang/Projects'
+    # here = '/home/boomatang/Projects'
     # here = '/home/boomatang/Documents'
+    here = "/mnt/dav/jimfity/Laptop/Home DIr/TODO"
     y = walk_path(here)
     print(y)
 

@@ -189,3 +189,4 @@ sys.var
 trial/
 .helper
 migrations/
+data1.db data.db
